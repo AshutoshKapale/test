@@ -1,3 +1,4 @@
+<!DOCTYPE>
 <html>
 <body>
 <script type="text/javascript"> 
