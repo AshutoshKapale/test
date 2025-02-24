@@ -1,0 +1,49 @@
+WITH ranked_submissions AS (
+    SELECT 
+        member_id,
+        policy_type,
+        submission_date,
+        from_date,
+        to_date,
+        grace_period_days,
+        LEAD(submission_date) OVER (PARTITION BY member_id ORDER BY to_date) AS next_submission_date
+    FROM member_submissions
+),
+penalty_calculation AS (
+    SELECT 
+        member_id,
+        policy_type,
+        submission_date,
+        to_date,
+        grace_period_days,
+        
+        -- Calculate grace period end date
+        to_date + grace_period_days AS grace_period_end_date,
+        
+        -- If next submission is after grace period, count penalty days
+        CASE 
+            WHEN policy_type = 'Insurance' 
+                 AND (next_submission_date IS NULL OR next_submission_date > to_date + grace_period_days) 
+            THEN 
+                COALESCE(
+                    GREATEST(
+                        DATE_PART('day', COALESCE(next_submission_date, CURRENT_DATE) - (to_date + grace_period_days)), 
+                        0
+                    ), 
+                    0
+                )
+            ELSE 0
+        END AS penalty_days
+    FROM ranked_submissions
+)
+SELECT 
+    member_id,
+    policy_type,
+    submission_date,
+    to_date,
+    grace_period_days,
+    grace_period_end_date,
+    penalty_days
+FROM penalty_calculation
+WHERE submission_date BETWEEN '2024-01-01' AND '2024-12-31'  -- Example filter
+ORDER BY member_id, to_date;
